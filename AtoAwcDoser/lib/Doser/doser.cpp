@@ -12,29 +12,37 @@ Doser::Doser(AsyncWebServer *server, Database *_db){
     util = new Utility();
     //setDbVariables();
     float amtF = db->getFloat("Doser/Blue/Calibration/secBluPerMl");
-    Serial.print("secBluMl from db is: ");
-    Serial.println(amtF);
+    //Serial.print("secBluMl from db is: ");
+    //Serial.println(amtF);
     setBluSecPerMl(amtF);
     amtF = db->getFloat("Doser/Green/Calibration/secGrnPerMl");
-    Serial.print("secGrnMl from db is: ");
-    Serial.println(amtF);
+    //Serial.print("secGrnMl from db is: ");
+    //Serial.println(amtF);
     setGrnSecPerMl(amtF);
     amtF = db->getFloat("Doser/Yellow/Calibration/secYelPerMl");
-    Serial.print("secYelMl from db is: ");
-    Serial.println(amtF);
+    //Serial.print("secYelMl from db is: ");
+    //Serial.println(amtF);
     setYelSecPerMl(amtF);
     amtF = db->getFloat("Doser/Purple/Calibration/secPurPerMl");
-    Serial.print("secPurMl from db is: ");
-    Serial.println(amtF);
+    //Serial.print("secPurMl from db is: ");
+    //Serial.println(amtF);
     setPurSecPerMl(amtF);
     int amt = db->getInt("Doser/Blue/Dosing/bluMl");
+    //Serial.print("bluMl from db is: ");
+    //Serial.println(amt);
     setBluMl(amt);
     amt = db->getInt("Doser/Green/Dosing/grnMl");
-    setGrnMl(amt);
+     //Serial.print("grnMl from db is: ");
+    //Serial.println(amt);
+   setGrnMl(amt);
     amt = db->getInt("Doser/Yellow/Dosing/yelMl");
-    setYelMl(amt);
+     //Serial.print("yelMl from db is: ");
+    //Serial.println(amt);
+   setYelMl(amt);
     amt = db->getInt("Doser/Purple/Dosing/purMl");
-    setPurMl(amt);
+     //Serial.print("purMl from db is: ");
+    //Serial.println(amt);
+   setPurMl(amt);
 }
 
 int Doser::calibrate(String color, bool start){
@@ -43,48 +51,48 @@ int Doser::calibrate(String color, bool start){
         if(start){
             int now = millis();
             retVal = now - startTime;
-            motor("blue",1);
+            motor(1,1);
             //return 0;
         }else{
             int now = millis();
             retVal = now - startTime;
-            motor("blue",0);
+            motor(1,0);
              //return stopTime;
         }
     }else if(color == "green"){
         if(start){
             int now = millis();
             retVal = now - startTime;
-            motor("green",1);
+            motor(2,1);
             //return 0;
         }else{
             int now = millis();
             retVal = now - startTime;
-            motor("green",0);
+            motor(2,0);
              //return stopTime;
         }
     }else if(color == "yellow"){
         if(start){
             int now = millis();
             retVal = now - startTime;
-            motor("yellow",1);
+            motor(3,1);
             //return 0;
         }else{
            int now = millis();
             retVal = now - startTime;
-            motor("yellow",0);
+            motor(3,0);
              //return stopTime;
         }
     }else if(color == "purple"){
         if(start){
             int now = millis();
             retVal = now - startTime;
-            motor("purple",1);
+            motor(4,1);
             //return 0;
         }else{
             int now = millis();
             retVal = now - startTime;
-            motor("purple",0);
+            motor(4,0);
              //return stopTime;
         }
     }
@@ -93,19 +101,25 @@ int Doser::calibrate(String color, bool start){
     return retVal/1000;
 }
 
-bool Doser::dose(String color){
+bool Doser::dose(int color){
     bool retVal = true;
     if(firstDoseTime){
         doseRun = 0; //TODO
         firstDoseTime = false;
-        if(color == "blue"){
+        if(color == 1){
             doseRun = getBluSecPerMl()*getBluMl();
-        }else if(color == "green"){
+        }else if(color == 2){
             doseRun = getGrnSecPerMl()*getGrnMl();
-        }else if(color == "yellow"){
+        }else if(color == 3){
             doseRun = getYelSecPerMl()*getYelMl();
-        }else if(color == "purple"){
+        }else if(color == 4){
+            //Serial.println("12.0");
             doseRun = getPurSecPerMl()*getPurMl();
+            Serial.print("Dose run for purple is: ");
+            Serial.println(doseRun);
+            //TODO just a hack/////////////////////////////////////////////////////
+            doseRun = 50;
+            //Serial.println("12.1");
         }
         //Serial.print("DoseRun is: ");
         //Serial.println(doseRun);
@@ -130,31 +144,31 @@ bool Doser::dose(String color){
     }
     //if it runs TOO long shut them all down
     if(elapse > MAX_DOSE_RUN){
-        motor("blue",0);
-        motor("green",0);
-        motor("yellow",0);
-        motor("purple",0);
+        motor(1,0);
+        motor(2,0);
+        motor(3,0);
+        motor(4,0);
         //TODO once have a decent logger, log dosing ran too long
         retVal = false;
     }
     return retVal;
 }
 
-void Doser::motor(String pump, int value) {
+void Doser::motor(int pump, int value) {
   bool pumpRunning = false;
-  if (pump == "blue") {
+  if (pump == 1) {
     Serial.print("Blue motor value is: ");
     Serial.println(value);
     digitalWrite(BLUEMOTOR, value);
-  } else if (pump == "green") {
+  } else if (pump == 2) {
     Serial.print("Green motor value is: ");
     Serial.println(value);
     digitalWrite(GREENMOTOR, value);
-  } else if (pump == "yellow") {
+  } else if (pump == 3) {
     Serial.print("Yellow motor value is: ");
     Serial.println(value);
     digitalWrite(YELLOWMOTOR, value);
-  } else if (pump == "purple") {
+  } else if (pump == 4) {
     Serial.print("Purpley motor value is: ");
     Serial.println(value);
     digitalWrite(PURPLEMOTOR, value);
@@ -168,13 +182,15 @@ bool Doser::setDbVariables(){
     secBluPerMl = db->getFloat("/Doser/Blue/Calibration/secBluPerMl");
     String secBluPerMlStr = String(secBluPerMl);
     Serial.print("Blue cal is: ");
-    Serial.println(secBluPerMlStr);
+    //Serial.println(secBluPerMlStr);
     db->putInt("/Doser/Blue/Dosing/bluMl",50);
     bluMl = db->getInt("/Doser/Blue/Dosing/bluMl");
     String bluMlStr = String(bluMl);
     util->writeFile(SPIFFS, "/secBluPerMl.txt", secBluPerMlStr.c_str());
     util->writeFile(SPIFFS, "/bluMl.txt", bluMlStr.c_str());
     db->putFloat("/Doser/Green/Calibration/secGrnPerMl",0.48);
+    secBluPerMlStr.clear();
+    bluMlStr.clear();
     secGrnPerMl = db->getFloat("/Doser/Green/Calibration/secGrnPerMl");
     String secGrnPerMlStr = String (secGrnPerMl);
     db->putInt("/Doser/Green/Dosing/grnMl",51);
@@ -209,24 +225,14 @@ float Doser::getBluSecPerMl(){
 
 void Doser::setBluSecPerMl(float secPerMl){
     secBluPerMl = secPerMl;
-    String secBluPerMlStr = String(secBluPerMl);
-    util->writeFile(SPIFFS, "/secBluPerMl.txt", secBluPerMlStr.c_str());
-    Serial.print("secBlueMl is: ");
-    Serial.println(secPerMl);
-    db->putFloat("Doser/Blue/Calibration/secBluPerMl", secPerMl);
 }
 
 int Doser::getBluMl(){
-    String bluMlStr =util->readFile(SPIFFS, "/bluMl.txt");
-    return bluMlStr.toInt();
+    return bluMl;
 }
 
 void Doser::setBluMl(int blMl){
-    String bluMlStr = String(blMl);
-    int bluMlInt = bluMlStr.toInt();
-    util->writeFile(SPIFFS, "/bluMl.txt", bluMlStr.c_str());
-    db->putInt("Doser/Blue/Dosing/bluMl", bluMlInt);
-
+ bluMl = blMl;
 }
 
 float Doser::getGrnSecPerMl(){
@@ -235,22 +241,14 @@ float Doser::getGrnSecPerMl(){
 
 void Doser::setGrnSecPerMl(float secPerMl){
     secGrnPerMl = secPerMl;
-    String secGrnPerMlStr = String(secGrnPerMl);
-    util->writeFile(SPIFFS, "/secGrnPerMl.txt", secGrnPerMlStr.c_str());
-    db->putFloat("Doser/Green/Calibration/secGrnPerMl", secPerMl);
 }
 
 int Doser::getGrnMl(){
-    String grnMlStr =util->readFile(SPIFFS, "/grnMl.txt");
-    return grnMlStr.toInt();
+    return grnMl;
 }
 
 void Doser::setGrnMl(int grMl){
-    String grnMlStr = String(grMl);
-    int grnMlInt = grnMlStr.toInt();
-    util->writeFile(SPIFFS, "/grnMl.txt", grnMlStr.c_str());
-    db->putInt("Doser/Green/Dosing/grnMl", grnMlInt);
-
+    grnMl = grMl;
 }
 
 float Doser::getYelSecPerMl(){
@@ -259,22 +257,14 @@ float Doser::getYelSecPerMl(){
 
 void Doser::setYelSecPerMl(float secPerMl){
     secYelPerMl = secPerMl;
-    String secYelPerMlStr = String(secYelPerMl);
-    util->writeFile(SPIFFS, "/secYelPerMl.txt", secYelPerMlStr.c_str());
-    db->putFloat("Doser/Yellow/Calibration/secYelPerMl", secPerMl);
 }
 
 int Doser::getYelMl(){
-    String yelMlStr =util->readFile(SPIFFS, "/yelMl.txt");
-    return yelMlStr.toInt();
+    return yelMl;
 }
 
 void Doser::setYelMl(int ywMl){
-    String yelMlStr = String(ywMl);
-    int yelMlInt = yelMlStr.toInt();
-    util->writeFile(SPIFFS, "/yelMl.txt", yelMlStr.c_str());
-    db->putInt("Doser/Yellow/Dosing/yelMl", yelMlInt);
-
+    yelMl = ywMl;
 }
 
 float Doser::getPurSecPerMl(){
@@ -283,22 +273,14 @@ float Doser::getPurSecPerMl(){
 
 void Doser::setPurSecPerMl(float secPerMl){
     secPurPerMl = secPerMl;
-    String secPurPerMlStr = String(secPurPerMl);
-    util->writeFile(SPIFFS, "/secPurPerMl.txt", secPurPerMlStr.c_str());
-    db->putFloat("Doser/Purple/Calibration/secPurPerMl", secPerMl);
 }
 
 int Doser::getPurMl(){
-    String purMlStr =util->readFile(SPIFFS, "/purMl.txt");
-    return purMlStr.toInt();
+    return purMl;
 }
 
 void Doser::setPurMl(int puMl){
-    String purMlStr = String(puMl);
-    int purMlInt = purMlStr.toInt();
-    util->writeFile(SPIFFS, "/purMl.txt", purMlStr.c_str());
-    db->putInt("Doser/Purple/Dosing/purMl", purMlInt);
-
+    purMl - puMl;
 }
 
 
@@ -312,4 +294,30 @@ void Doser::setErrorCode(int errCode){
 
 int Doser::getDoseRun(){
     return lastDoseRun;
+}
+//TODO call this with the automatic db  update
+void Doser::updateDoserDb(){
+
+
+    secBluPerMl = db->getFloat("Doser/Blue/Calibration/secBluPerMl");
+
+    bluMl = db->getInt("Doser/Blue/Dosing/bluMl");
+
+    secGrnPerMl = db->getFloat("Doser/Green/Calibration/secGrnPerMl");
+
+    grnMl = db->getInt("Doser/Green/Dosing/grnMl");
+ 
+    secYelPerMl = db->getFloat("Doser/Yellow/Calibration/secYelPerMl");
+
+    grnMl = db->getInt("Doser/Green/Dosing/grnMl");
+ 
+    yelMl = db->getInt("Doser/Yellow/Dosing/yelMl");
+
+   // util->writeFile(SPIFFS, "/secPurPerMl.txt", secPurPerMlStr.c_str());
+    secPurPerMl = db->getFloat("Doser/Purple/Calibration/secPurPerMl");
+
+
+
+    //util->writeFile(SPIFFS, "/purMl.txt", purMlStr.c_str());
+    purMl = db->getInt("Doser/Purple/Dosing/purMl");
 }

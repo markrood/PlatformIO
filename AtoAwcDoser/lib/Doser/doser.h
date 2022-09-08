@@ -12,8 +12,8 @@ class Doser{
 
 
         int calibrate(String color, bool start);
-        bool dose(String color);
-        void motor(String pump, int value);
+        bool dose(int color);
+        void motor(int pump, int value);
         float getBluSecPerMl();
         void setBluSecPerMl(float secPerMl);
         int getBluMl();
@@ -34,6 +34,7 @@ class Doser{
         void setErrorCode(int errCode);
         bool setDbVariables();
         int getDoseRun();
+        void updateDoserDb();
 
     private:
         Database *db;
