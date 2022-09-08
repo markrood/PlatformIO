@@ -264,3 +264,23 @@ bool Database::putData(String path, FirebaseJson json){
       Serial.printf("Set json... %s\n", Firebase.RTDB.setJSON(&fbdo, parent.c_str(), &json) ? "ok" : fbdo.errorReason().c_str());
       return retVal;
     }
+
+    bool Database::putColorMlSec(String parent, String child, int amt){
+        bool retVal = false;
+      FirebaseJson json;
+      json.set(child.c_str(), String(amt));
+      //retVal = Firebase.RTDB.setJSON(&fbdo, parent.c_str(), &json);
+      Serial.printf("Set json... %s\n", Firebase.RTDB.setJSON(&fbdo, parent.c_str(), &json) ? "ok" : fbdo.errorReason().c_str());
+      return retVal;
+   
+    }
+
+    bool Database::putDailyAfillData(String parent, String child, int amt){
+      bool retVal = false;
+      FirebaseJson json;
+      json.set(child.c_str(), String(amt));
+      //retVal = Firebase.RTDB.setJSON(&fbdo, parent.c_str(), &json);
+      Serial.printf("Set json... %s\n", Firebase.RTDB.setJSON(&fbdo, parent.c_str(), &json) ? "ok" : fbdo.errorReason().c_str());
+      return retVal;
+
+    }

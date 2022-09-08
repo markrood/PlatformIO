@@ -52,6 +52,8 @@ class Database
     FirebaseJson* getJson(String path);
     
     bool putDailyDoseData(String parent, String child, int amt);
+    bool putDailyAfillData(String parent, String child, int amt);
+    bool putColorMlSec(String parent, String child, int amt);
     
   private:
     //Define Firebase Data object
