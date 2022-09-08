@@ -9,14 +9,18 @@
 
 class FishTime{
     private:
+        //const char* ntpServer = "pool.ntp.org";
+        //const char* location  = "America/Chicago";
         const char* ntpServer = "pool.ntp.org";
-        const char* location  = "America/Chicago";
+        const long  gmtOffset_sec = -21600;
+            const int   daylightOffset_sec = 3600;
         int currentHour = 99;
         struct tm timeinfo;
 
 
     public:
         FishTime();
+        void syncTime();
         void initTime();
         bool update();
         int getHour();

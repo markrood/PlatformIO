@@ -18,28 +18,36 @@
 #include "time_zones.h"
 
 FishTime::FishTime(){
-  initTime();
-  Serial.println("FishTime constructor was called");
-  configTimeWithTz(getTzByLocation(location), ntpServer);
+  //Serial..println("FishTime constructor was called");
+  //configTimeWithTz(getTzByLocation(location), ntpServer);
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+    initTime();
 }
 
-void FishTime::initTime(){
-    
-  if(!getLocalTime(&timeinfo)){
-    Serial.println("Failed to obtain time");
-    return;
+void FishTime::initTime(){ 
+  int i = 0;
+//Serial.println("4.0");
+  while(!getLocalTime(&timeinfo) && i < 5){
+    Serial.println("Failed to obtain time in init");
+    i++;
+    delay(1000);
   }
   //Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
-  
+  i = 0;
 }
 
 bool FishTime::update(){
     struct tm timeinfo;
+    int i = 0;
     bool retVal = true;
-  if(!getLocalTime(&timeinfo)){
-    Serial.println("Failed to obtain time");
-    return false;
+//Serial.println("6.0");
+  while(!getLocalTime(&timeinfo) && i<5){
+    Serial.println("Failed to obtain time in update");
+    retVal = false;
+    i++;
+    delay(1000);
   }
+  i = 0;
   if(timeinfo.tm_mday == currentHour){
     //Serial.println("Still Current Day!");
     return retVal;
@@ -50,12 +58,14 @@ bool FishTime::update(){
       return retVal;
     }else{
       //do time update
-      configTimeWithTz(getTzByLocation(location), ntpServer);
+      //configTimeWithTz(getTzByLocation(location), ntpServer);
+      configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
       Serial.println("Just updated RTC with Network Time");
       currentHour = timeinfo.tm_mday;
       return retVal;
     }
   }
+  return retVal;
 }
 
 int FishTime::getHour(){
@@ -76,4 +86,9 @@ int FishTime::getMonth(){
 }
 int FishTime::getDay(){
   return timeinfo.tm_mday;
+}
+
+void FishTime::syncTime(){
+  //configTimeWithTz(getTzByLocation(location), ntpServer); 
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 }
