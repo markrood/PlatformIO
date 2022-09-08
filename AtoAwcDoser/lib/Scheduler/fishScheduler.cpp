@@ -1,4 +1,4 @@
-/*******************************************************************************************/
+/*****************************************************************************************/
 //
 //  Class:
 //    FishSched
@@ -29,6 +29,7 @@ void FishSched::updateMyTime(){
 }
 
 void FishSched::tick(){
+//Serial.println("1.11");
   int nowHour = getHour();
     if(nowHour != currHour ){
       if(firstHour){
@@ -44,16 +45,21 @@ void FishSched::tick(){
 }
 
 void FishSched::tock(){
+//Serial.println("1.22");
   int nowMinute = getMinute();
+  //Serial.println("1.23");
   if(nowMinute != currentMinute){
+    //Serial.println("1.24");
     currentMinute = nowMinute;
-    //Serial.println(currentMinute);
+    ////Serial.println(currentMinute);
     blow15MinuteHorn(currentMinute);
+    //Serial.println("1.25");
     blow30MinuteHorn(currentMinute);
   }
 }
 
 void FishSched::blowHourHorn(int hr){
+  //Serial.println("0.1111");
   addHour();
   if(hr == 1){
     //Serial.println("the hour is 1");
@@ -128,12 +134,15 @@ void FishSched::blowHourHorn(int hr){
     //Serial.println("the hour is 0");  
     flags.set(Midnight);
   }
+  //Serial.println("doneeeeeeeee with flags.set");
+
 }
 
 void FishSched::blow15MinuteHorn(int m){
   if(m == 15 || m == 30 || m == 45 || m == 0){
     //Serial.println("Fifteen Minute Alarm");
     flags.set(Fifteen);
+    //Serial.println("Fifteen Minute Alarm");
   }
 }
 
@@ -141,6 +150,7 @@ void FishSched::blow30MinuteHorn(int m){
   if(m == 30 || m == 0){
     //Serial.println("Thirty Minute Alarm");
     flags.set(Thirty);
+    //Serial.println("Thirty Minute Alarm");
   }
 }
 
@@ -151,26 +161,31 @@ void FishSched::addHour(){
   fourHourAlarm++;
   eightHourAlarm++;
   twelveHourAlarm++;
+//Serial.println("3.0");
 
   if(oneHourAlarm == 1){
     oneHourAlarm = 0;
     //blow2HourHorn();
     flags.set(Hour);
+    Serial.println("One Hour Alarm");
   }
   if(twoHourAlarm == 2){
     twoHourAlarm = 0;
     //blow2HourHorn();
     flags.set(TwoHour);
+    Serial.println("Two Hour Alarm");
   }
   if(threeHourAlarm == 3){
     threeHourAlarm = 0;
     //blow3HourHorn();
     flags.set(ThreeHour);
+    Serial.println("Three Hour Alarm");
   }
 
   if(fourHourAlarm == 4){
     fourHourAlarm = 0;
     //blow4HourHorn();
+    Serial.println("Four Hour Alarm");
     flags.set(FourHour);
   }
 
@@ -178,12 +193,14 @@ void FishSched::addHour(){
     eightHourAlarm = 0;
     //blow8HourHorn();
     flags.set(EightHour);
+    Serial.println("Eight Hour Alarm");
   }
 
   if(twelveHourAlarm == 12){
     twelveHourAlarm = 0;
     //blow12HourHorn();
     flags.set(TwelveHour);
+    Serial.println("Twelve Hour Alarm");
   }
 
 }
@@ -198,6 +215,8 @@ bool FishSched::isFlagSet(int flag){
 }
 
 void FishSched::resetFlag(int flag){
+ // Serial.println("2,2,2");
   flags.flip(flag);
+  //Serial.println("2.2.4");
 }
 
