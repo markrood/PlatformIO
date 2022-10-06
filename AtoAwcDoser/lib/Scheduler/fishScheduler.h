@@ -33,7 +33,8 @@ class FishSched: public FishTime{
         Noon,OnePm,TwoPm,ThreePm,FourPm,FivePm,SixPm,SevenPm,EightPm,NinePm,TenPm,ElevenPm,
         NumFlags
         };
-    std::bitset<NumFlags> flags;
+    //std::bitset<NumFlags> flags;
+    int flags[31] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
     int nf = NumFlags;
 
 
@@ -57,6 +58,10 @@ typedef uint64_t flags_t;
         //std::bitset<N> getFlags();
         bool isFlagSet(int flag);
         void resetFlag(int flag);
+        void setFlag(int evt,int val);
+
+        void printArray();
+
        
 
 };
