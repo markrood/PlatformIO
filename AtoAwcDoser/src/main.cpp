@@ -1,5 +1,5 @@
-/***********************************************************************/
-//  Description:
+/***********************************************begin************************/
+//  Description:{}
 //    This main class just loops and calls tick and tock to run the
 //    event machine in FishScheduler.  The if loops thru all 31 events
 //    (i.e. hour,15min,30min,2h,3h,4h,8h,12h,1am-noon, 1pm-midnight) to see
@@ -53,7 +53,7 @@
 #include "AsyncTCP.h"
 
 #include "ESPAsyncWebServer.h"
-#include "ESPAsyncWiFiManager.h"         //https://github.com/tzapu/WiFiManager
+#include "ESPAsyncWiFiManager.h"         //https://gitWiFiManagerhub.com/tzapu/WiFiManager
 //#include <WiFiManager.h>
 #include <WebSerial.h>
 #include <ESPmDNS.h>
@@ -64,7 +64,11 @@
 #include "utility.h"
 //#include "SPIFFS.h"
 #include "Effortless_SPIFFS.h"
+#include "ArduinoJson.h"
+//#include <Wire.h>  // must be included here so that Arduino library object file references work
+//#include <RtcDS3231.h>
 
+//RtcDS3231<TwoWire> Rtc(Wire);
 
 AsyncWebServer server(80);
 DNSServer dns;
@@ -77,13 +81,27 @@ bool writeDailyDoseAmtToDb(String color, int amt);
 bool writeDailyDosesToDb();
 bool writeCalibrationToDb(int color, float amt);
 void setDate();
+int sendHttp(String event);
+/*void setTheTime(tm localTime);
+bool getNTPtime(int sec);
+//bool isDateTimeValid();
+//void printDateTime(RtcDateTime now);
+void setRtcTime();
+int getCurrentTime(String input); */
+
+void doseBlue(int evt);
+void doseGreen(int evt);
+void doseYellow(int evt);
+void dosePurple(int evt);
+
+bool notDosing();
 
 
 int led = 2;
 FishSched *mySched;
 Doser *doser;
 Database *db;
-Utility *util;
+static Utility *util;
 //FishTime *myTime;
     enum{Hour,Fifteen,Thirty,TwoHour,ThreeHour,FourHour,EightHour,TwelveHour,
         Midnight,OneAm,TwoAm,ThreeAm,FourAm,FiveAm,SixAm,SevenAm,EightAm,NineAm,TenAm,ElevenAm,
@@ -103,11 +121,12 @@ int YW_BTN_PIN = 23;
 int PU_BTN_PIN = 17;
 int BLUEMOTOR = 33;
 int GREENMOTOR = 26;
-int YELLOWMOTOR = 14;
+int YELLOWMOTOR = 12;
 int PURPLEMOTOR = 13;
 int LED = 2;
 
 int MINCALTIME = 10;
+int count = 0;
 
 bool calibrationRunning = false;
 bool blueDosing = false;
@@ -154,12 +173,46 @@ eSPIFFS fileSystem;
   int mo = 0;
   int da = 0;
   String daStr = "";
-  
+  bool restart = false;
 
- 
+const char* host = "maker.ifttt.com";  //used in sendHttp
+const int httpsPort = 80;  //used in sendHttp
+String url = "";  //used in sendHttp
+WiFiClient client;  //this is passed into Dosing constructor for connecting to doser
+String iPAddress;
 
+int newDay = 0;
+//tm timeinfo;
+//time_t now;
 
-//TODO
+/*int monthDay;
+int currentMonth;
+String currentMonthName;
+int currentYear;
+String formattedTime;
+int currentDay;
+int currentHour;
+int currentMinute;
+int currentSecond; */
+
+bool wifiConnected = true; //TODO do this right
+
+int** evtPumpArr;
+
+bool bluePumpPending = false;
+bool greenPumpPending = false;
+bool yellowPumpPending = false;
+bool purplePumpPending = false;
+bool blueDosed = false;
+bool greenDosed = false;
+bool yellowDosed = false;
+bool purpleDosed = false;
+bool alreadyReset = false;
+unsigned long sendDataPrevMillis = 0;
+
+//bool Database::dataChanged = false;
+
+//TODO 
 //int testInt = 0; //just a test int for faking day REMOVE it
 
 
@@ -221,8 +274,8 @@ void setup() {
   doser = new Doser(&server,db);
   //util = new Utility;
    
-  mySched->updateMyTime();
-  mySched->initTime();
+  // mySched->initTime();
+   mySched->updateMyTime();
   //setup calibrate buttons
   blueBtn.begin(BLU_BTN_PIN);
   greenBtn.begin(GRN_BTN_PIN);
@@ -247,18 +300,20 @@ void setup() {
   #endif
   
   // Serial.begin(115200);
-
+  //evtPumpArr = db->getEvtPump();
   //util->startSpiffs();
   String test = "test";
   //util->writeFile(SPIFFS,"/test", test.c_str());
-
+  //fileSystem.saveToFile("restart.txt" 0);
   //db->initDb();
   setDate();
-  delay(10);
+   delay(10);
 }
 
 void loop() {
 //TODO remove just fashing led......
+//Serial.println("0");
+//mySched->printArray();
   if(blinking){
     digitalWrite(LED, 0);
     blinking = false;
@@ -267,7 +322,17 @@ void loop() {
     blinking = true;
   }
   //check if any calibraton button is pressed and only do that
+  if (Firebase.ready() && (millis() - sendDataPrevMillis > 15000 || sendDataPrevMillis == 0))
+  {
+    sendDataPrevMillis = millis();
+    count++;
+    //db->callBack();
+  }
 
+  if(Database::dataChanged){
+    db->setEvents();
+    Database::dataChanged= false;
+  }
   //Serial.println("0.0.0");
   bool bluePushed = blueBtn.debounce();
   //Serial.println("0.0.1");
@@ -279,9 +344,11 @@ void loop() {
   //Serial.println("0.0.4");
 
    while (WiFi.status() != WL_CONNECTED ){
+    //TODO db->callBack should be called
     if(w < 2){
       Serial.print('!');
       WebSerial.print("M_wfnc");
+      //Serial.println("-1");
       delay(1000);
       w = 0;
       break;
@@ -289,6 +356,7 @@ void loop() {
       w++;
     }
   }
+
   
   //Serial.println(WiFi.localIP());
 
@@ -407,6 +475,7 @@ void loop() {
 ////////////////////////////////////////////////
  
   if(calibrationRunning){
+    //Serial.println("1");
 //Serial.println("0.5");
     if(blueWasPressed){
       if(bluCalRunning && !grnCalRunning && !ywCalRunning && !puCalRunning){
@@ -515,14 +584,20 @@ void loop() {
       }
     }
   }else{
+    //Serial.println("2");
+   // mySched->printArray();
 //Serial.println("1.0");
-    mySched->initTime(); //initializes time MUST DO THIS
+    //Serial.println("in main about to setNowTime");
+    mySched->setNowTime(); //initializes time MUST DO THIS
   // mySched->updateMyTime();
+  //mySched->printArray();
     mySched->tick(); //sets hour
+//mySched->printArray();
     //Serial.print("Hour is: ");
     //Serial.println(nowHour);
-
+//mySched->printArray();
     mySched->tock();//sets minute
+//mySched->printArray();
     //Serial.print("Minute is: ");
     //Serial.println(nowMinute);
   
@@ -534,243 +609,565 @@ void loop() {
   /////////////////////////////////////
 
 //Serial.println("2.0");
-int z = 0;
-    for(int i= 0;i<NumFlags-1;i++){
-      bool flagSet = mySched->isFlagSet(i);
-z++;
+//mySched->printArray();
+//Serial.println("Just getting for flag for loop");
+  int z = 0;
+  for(int i= 0;i<32;i++){
+      int flagSet = mySched->isFlagSet(i);
+      z++;
 //Serial.print("z is: ");
 //Serial.println(z);
-      if(flagSet){
-        //Serial.print("i is: ");
-        //WebSerial.println("i is: ");
+      if(flagSet == 1){
+        //Serial.println("2,1");
+        //Serial.print("event in loop is: ");
         //Serial.println(i);
-        //WebSerial.println(i);
-        //Serial.print("Value is: ");
-        // WebSerial.println("Value is: ");
-       //Serial.println(flagSet);
-        //WebSerial.println(flagSet);
-        
-        if(i== 0){
-          ////Serial.println("One Hour");
-          if(!blueDosing && !greenDosing && !purpleDosing){
-              WebSerial.print("Y");
-            yellowDosing = doser->dose(3);
-            if(!yellowDosing){         
-              mySched->resetFlag(0);
-              Serial.println("y");
-              WebSerial.print("y"); 
-              int err = doser->getErrorCode();
-              if(err == 99){
-                WebSerial.println("D_Y_tl");
-              }
-              int amt = addDailyDoseAmt(3,doser->getDoseRun());
-            delay(1000); // have to delay here so doesn't reset 15 min timer wait a minute
-            }
-          }
-        }
-        if(i == 1){
+ ////////////////////////////////////////////////////////////////////////////////////////////////////////
+  //one_hour=0, fifteen=1, thirty=2, two_hour=3, three_hour=4, 
+  //four_hour=5,eight_hour=6, twelve_hour=7,
+  //midnight=8, one_am=9, two_am=10, three_am=11, four_am=12, 
+  //five_am=13, six_am=14, severn_am=15,
+  //eight_amm=16, nine_am=17 ten_am=18, eleven_am=19,
+  // noon=20, one_pm=21, two_pm=22, three_pm=23, 
+  //four_pm=24, five_pm=25, six_pm=26, severn_pm=27,
+  //eight_pmm=28, nine_pm=29 ten_pm=30, eleven_pm=31,
+  //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-          //Serial.println("Fifteen Minutes");
-            //Serial.print("@");
-            //Serial.print("************************  ");
-            //Serial.println(ESP.getFreeHeap());
-//Serial.println("2.1");
-          if(!greenDosing && !yellowDosing && !purpleDosing){
-            WebSerial.print("B");
-            blueDosing = doser->dose(1);
-            if(!blueDosing){         
-//Serial.println("2.1");
-              mySched->resetFlag(1);
-              Serial.println("b");
-              WebSerial.print("b");
-              
-              int err = doser->getErrorCode();
-              if(err == 99){
-                WebSerial.println("D_B_tl");
-              }
-              int amt = addDailyDoseAmt(1,doser->getDoseRun());
-              //TODO remove
-             
-              //mySched->resetFlag(1);
-              delay(1000); // have to delay here so doesn't reset 15 min timer wait a minute
-            }
-          }
-                    //TODO remove this it is at midnight just testing a every 15min
-        }
-        if(i== 2){
-          //Serial.println("Thirty Minutes");
-          if(!blueDosing && !yellowDosing && !purpleDosing){
-              WebSerial.print("G");
-              greenDosing = doser->dose(2);
-              //Serial.println("Shi9");
-            if(!greenDosing){         
-              mySched->resetFlag(2);
-              Serial.println("g");
-              WebSerial.print("g");
-               int err = doser->getErrorCode();
-              if(err == 99){
-                WebSerial.println("D_G_tl");
-              }
-              int amt = addDailyDoseAmt(2,doser->getDoseRun());
-           delay(1000); // have to delay here so doesn't reset 15 min timer wait a minute
-            }
-          }
-        }
-        if(i== 3){
-          //Serial.println("Two Hour");
-          if(!blueDosing && !yellowDosing && !greenDosing){
-              WebSerial.print("P");
-            purpleDosing = doser->dose(4);
-            if(!purpleDosing){         
-              mySched->resetFlag(3);
-              Serial.println("p");
-              WebSerial.print("p");
-              int err = doser->getErrorCode();
-              if(err == 99){
-                WebSerial.println("D_P_tl");
-              }
-              int amt = addDailyDoseAmt(4,doser->getDoseRun());
-            delay(1000); // have to delay here so doesn't reset 15 min timer wait a minute
-            }
-          }
-        }
-        if(i== 4){
-          Serial.println("Three Hour");
-              mySched->resetFlag(4);
-        }
-        if(i== 5){
-          Serial.println("Four Hour");
-          mySched->syncTime();
-          mySched->resetFlag(5);
-        }
-        if(i== 6){
-          Serial.println("Eight Hour");
-          mySched->resetFlag(6);
-        }
-        if(i== 7){
-           Serial.println("Twelve Hour");
-            mySched->resetFlag(7);
-        }
-        if(i == 8){ 
-          Serial.println("Midnight");
-          bool didDbWrite = writeDailyDosesToDb();
-          mySched->resetFlag(8);
-        }
-        if(i== 9){
-          Serial.println("One Am");
-          mySched->resetFlag(9);
-        }
-        if(i== 10){
-         // Serial.println("Two Am");
-          mySched->resetFlag(10);
-        }
-        if(i== 11){
-          Serial.println("Three Am");
-          mySched->resetFlag(11);
-        }
-        if(i== 12){
-          Serial.println("Four Am");
-          mySched->resetFlag(12);
-        }
-        if(i== 13){
-         // Serial.println("Five Am");
-          mySched->resetFlag(13);
-        }
-        if(i== 14){
-          Serial.println("Six Am");
-          mySched->resetFlag(14);
-        }
-        if(i== 15){
-          Serial.println("Seven Am");
-          mySched->resetFlag(15);
-        }
-        if(i== 16){
-          Serial.println("Eight Am");
-          mySched->resetFlag(16);
-        }
-        if(i==17){
-          Serial.println("Nine Am");
-          mySched->resetFlag(17);
-        }
-        if(i== 18){
-          Serial.println("Ten Am");
-          mySched->resetFlag(18);
-        }
-        if(i== 19){
-          Serial.println("Eleven Am");
-          mySched->resetFlag(19);
-        }
-        if(i== 20){ // doing time update an noon
-          Serial.println("Noon");
-          bool retVal = mySched->update();
-          if(!retVal){
-            WebSerial.print("M_ftgt");
-          }
-          mySched->resetFlag(20);
-        }
-        if(i== 21){
-         // Serial.println("One Pm");
-          mySched->resetFlag(21);
-        }
-        if(i== 22){
-         // Serial.println("Two Pm");
-          mySched->resetFlag(22);
-        }
-        if(i== 23){
-          // Serial.println("Three Pm");
-          mySched->resetFlag(23);
-       }
-        if(i== 24){
-          Serial.println("Four Pm");
-          mySched->resetFlag(24);
-        }
-        if(i== 25){
-          Serial.println("Five Pm");
-          mySched->resetFlag(25);
-        }
-        if(i== 26){
-         // Serial.println("Six Pm");
-          mySched->resetFlag(26);
-        }
-        if(i== 27){
-          Serial.println("Seven Pm");
-          mySched->resetFlag(27);
-        }
-        if(i==28){
-           Serial.println("Eight Pm");
-         mySched->resetFlag(28);
-        }
-        if(i== 29){
-          Serial.println("Nine Pm");
-          mySched->resetFlag(29);
-        }
-        if(i== 30){
-          Serial.println("Ten Pm");
-          mySched->resetFlag(30);
-        }
-        if(i== 31){
-        Serial.println("Eleven Pm");
-        setDate();
-         mySched->resetFlag(31);
-        }
-      }
+   /////////////////  one_hour  /////////////////////////////////
+    if(i== 0 && db->isThisEventPumpSet(i, 0)){
+      //Serial.println("5");
+      doseBlue(i);
     }
+    if (i == 0 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 0 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 0 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 0 && notDosing() && !alreadyReset){
+      //Serial.println("6");
+      mySched->setFlag(i,0);
+    }
+  /////////////////  fifteen  /////////////////////////////////
+    if(i == 1 && db->isThisEventPumpSet(i, 0)){
+      //Serial.println("7");
+      doseBlue(i);
+    }
+    if (i == 1 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 1 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if(i == 1 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i == 1 && notDosing() && !alreadyReset){
+      //Serial.println("8");
+      mySched->setFlag(i,0);
+    }
+
+  /////////////////  thirty  /////////////////////////////////
+    if(i== 2 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 2 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 2 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 2 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 2 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  two_hour  /////////////////////////////////
+    if(i== 3 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 3 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 3 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 3 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 3 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  three_hour  /////////////////////////////////
+    if(i== 4 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 4 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 4 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 4 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 4 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+  /////////////////  four_hour  /////////////////////////////////
+    if(i== 5 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 5 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 5 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 5 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 5 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+  /////////////////  eight_hour  /////////////////////////////////
+    if(i== 6 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 6 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 6 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 6 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+     if(i== 6 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+  /////////////////  twelve_hour  /////////////////////////////////
+    if(i== 7 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 7 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 7 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 7 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 7 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+  /////////////////  midnight  /////////////////////////////////
+    if(i== 8 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 8 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 8 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 8 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 8 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  one_am  /////////////////////////////////
+    if(i== 9 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 9 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 9 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 9 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+     if(i== 9 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+  /////////////////  two_am  /////////////////////////////////
+    if(i== 10 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 10 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 10 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 10 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 10 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  three_am  /////////////////////////////////
+    if(i== 11 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 11 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 11 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 11 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 11 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  four_am  /////////////////////////////////
+    if(i== 12 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 12 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 12 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 12 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 12 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  five_am  /////////////////////////////////
+    if(i== 13 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 13 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 13 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 13 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 13 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  siz_am  /////////////////////////////////
+    if(i== 14 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 14 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 14 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 14 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 14 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  seven_am  /////////////////////////////////
+    if(i== 15 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 15 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 15 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 15 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 15 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  eight_am  /////////////////////////////////
+    if(i== 16 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 16 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 16 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 16 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 16 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  nine_am  /////////////////////////////////
+    if(i== 17 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 17 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 17 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 17 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 17 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  ten_am  /////////////////////////////////
+    if(i== 18 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 18 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 18 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 18 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 18 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  eleven_am  /////////////////////////////////
+    if(i== 19 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 19 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 19 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 19 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 19 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  noon  /////////////////////////////////
+    if(i== 20 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 20 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 20 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 20 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 20 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  one_pm  /////////////////////////////////
+    if(i== 21 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 21 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 21 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 21 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 21 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  two_pm  /////////////////////////////////
+    if(i== 22 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 22 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 22 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 22 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 22 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  three_pm  /////////////////////////////////
+    if(i== 23 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 23 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 23 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 23 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 23 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  four_pm  /////////////////////////////////
+    if(i== 24 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 24 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 24 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 24 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 24 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  five_pm  /////////////////////////////////
+    if(i== 25 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 25 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 25 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 25 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 25 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  siz_pm  /////////////////////////////////
+    if(i== 26 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 26 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 26 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 26 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 26 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  seven_pm  /////////////////////////////////
+    if(i== 27 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 27 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 27 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 27 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 27 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  eight_pm  /////////////////////////////////
+    if(i== 28 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 28 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 28 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 28 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }  
+     if(i== 28 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+  /////////////////  nine_pm  /////////////////////////////////
+    if(i== 29 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 29 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 29 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 29 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+     if(i== 29 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+  /////////////////  ten_pm  /////////////////////////////////
+    if(i== 30 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 30 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 30 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 30 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 30 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+   /////////////////  eleven_pm  /////////////////////////////////
+    if(i== 31 && db->isThisEventPumpSet(i, 0)){
+      doseBlue(i);
+    }
+    if (i == 31 && db->isThisEventPumpSet(i, 1)){
+      doseGreen(i);
+    }
+    if(i == 31 && db->isThisEventPumpSet(i, 2)){
+      doseGreen(i);
+    }
+    if (i == 31 && db->isThisEventPumpSet(i, 3)){
+      dosePurple(i);
+    }
+    if(i== 31 && notDosing() && !alreadyReset){
+      mySched->setFlag(i,0);
+    }
+       }else{
+        blueDosed = false;
+        greenDosed = false;
+        yellowDosed = false;
+        purpleDosed = false;
+       } //if 
+      //Serial.println("out of flagset loop");
+  }//for loop
+
     //Serial.println("Dam");
     delay(1000);
-    //Serial.println(ESP.getFreeHeap());
+    //Serial.println(ESP.getFreeHeap(i));
     //WebSerial.println(ESP.getFreeHeap());
     
     //Serial.print(".");
     WebSerial.print(".");
    
-    //TODO just testing button junk remove
-    //if(!blueDosing && !greenDosing && !yellowDosing && !purpleDosing){
-      //delay(45000);
-    //}
-
-  }//normal loop no calibraton
-
-}
+     }//else no cal
+}//loop
 
 //////////////////////////////////////////////////////////////
 // call back needed for wifi
@@ -1035,7 +1432,7 @@ bool writeDailyDosesToDb(){
   retVal = writeDailyDoseAmtToDb("Green", greenDailyDoseAmt);
   //writeFile(SPIFFS, "/greenDailyDoseAmt.txt",reset.c_str());
   //yellowDailyDoseAmtStr = readFile(SPIFFS, "/yellowDailyDoseAmt.txt");
-  fileSystem.openFromFile("/greenDailyDoseAmt.txt", yellowDailyDoseAmt);
+  fileSystem.openFromFile("/yellowDailyDoseAmt.txt", yellowDailyDoseAmt);
   /*int ylwAmt = 0;
   if(yellowDailyDoseAmtStr != ""){
     ylwAmt = yellowDailyDoseAmtStr.toInt();
@@ -1043,7 +1440,7 @@ bool writeDailyDosesToDb(){
   retVal = writeDailyDoseAmtToDb("Yellow", yellowDailyDoseAmt);
   //writeFile(SPIFFS, "/yellowDailyDoseAmt.txt",reset.c_str());
   //purpleDailyDoseAmtStr = readFile(SPIFFS, "/purpleDailyDoseAmt.txt");
-  fileSystem.openFromFile("/greenDailyDoseAmt.txt", purpleDailyDoseAmt);
+  fileSystem.openFromFile("/purpleDailyDoseAmt.txt", purpleDailyDoseAmt);
   /*int purAmt = 0;
   if(purpleDailyDoseAmtStr != ""){
     purAmt = purpleDailyDoseAmtStr.toInt();
@@ -1084,21 +1481,334 @@ bool writeCalibrationToDb(int color, float amt){
 }
 
 void setDate(){
-  mySched->update();
-  yr = mySched->getYear();
-  yr = yr+1900;
+  mySched->syncTime();
+  yr = mySched->getCurrentYear();
+  yr = yr;
   yrStr = String(yr);
   Serial.print("Year is: ");
   Serial.println(yrStr);
-  mo = mySched->getMonth();
+  mo = mySched->getCurrentMonth();
   Serial.print("Month is: ");
   Serial.println(mo);
 
-  da = mySched->getDay();
-  daStr = String(da);
-  Serial.print("Day is: ");
+  da = mySched->getCurrentDay();
+  daStr = String(da-1);  //i need the day for save to db be the day before since i save at midnight
+  Serial.print("YesterDay is: ");
   Serial.println(daStr);
  
   fileSystem.saveToFile("/curDay.txt", daStr);
 
 }
+
+//////////////////////////////////////////////////////////////
+//                                                          //
+//   sentHttp                                               //
+//                                                          //
+//   input: String message                                  //
+//                                                          //
+//   output: int (not used)                                 //
+//                                                          //
+//   description:  this uses the ifttt service to send      //
+//                  push notifications                      //
+//
+//                                                          //
+//////////////////////////////////////////////////////////////
+int sendHttp(String event) {
+  int ret = 0;
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    //Serial.print("*");
+  }
+
+  //Serial.println("");
+  // Serial.println("WiFi connected");
+  //Serial.println("IP address: ");
+  // Serial.println(WiFi.localIP());
+
+
+  //Serial.print("connecting to ");
+  //Serial.println(host + url);
+  //  client.setInsecure();
+  if (!client.connect(host, httpsPort)) {
+
+    Serial.println("connection failed");
+    return 0;
+  }
+  //Serial.print("requesting URL: ");
+  String iftt = "fBplW8jJqqotTqTxck4oTdK_oHTJKAawKfja-WlcgW-";//atoAwcUtil->readFile(SPIFFS, "/ifttt.txt");
+
+  if (event == "Email") {
+    //Serial.println("sending email");
+    //url = "/trigger/" + event + "/with/key/"+iftt;//+",params={ \"value1\" : \""+iPAddress+"\", \"value2\" : \"02\", \"value3\" : \"03\" }";
+    //Serial.println(url);
+    //https://maker.ifttt.com/trigger/garage_deur/with/key/d56e34gf756/?value1=8&value2=5&value3=good%20morning
+    //TESTING JSON CREATION
+    String url = "/trigger/" + event + "/with/key/" + iftt;
+    //Serial.println("Starting JSON");
+    StaticJsonDocument<80> jdata;
+    //        StaticJsonBuffer<69> jsonBuffer;
+    String json = "{ \"value1\" : \"atoawc ip: " + iPAddress + "\", \"value2\" : \", atoawc hotspot pw: ato_awc_\", \"value3\" : \", doser hotspot pw : yourdoser\" }";
+    auto error = deserializeJson(jdata, json);
+    //        JsonObject& root = jsonBuffer.parseObject(json);
+    //Serial.println("TESTING POST");
+
+    client.print(String("POST ") + url + " HTTP/1.1\r\n" +
+                 "Host: " + host + "\r\n" +
+                 //"Connection: close\r\n" +
+                 "Content-Type: application/json\r\n" +
+                 "Content-Length: " + json.length() + "\r\n" +
+                 "\r\n" + // This is the extra CR+LF pair to signify the start of a body
+                 json + "\n");
+  } else {
+
+    //url = "/trigger/"+event+"/with/key/bOZMgCFy7Bnhee7ZRzyi19";
+    url = "/trigger/" + event + "/with/key/" + iftt;
+
+    //Serial.println(url);
+
+    client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+                 "Host: " + host + "\r\n" +
+                 "User-Agent: BuildFailureDetectorESP8266\r\n" +
+                 "Connection: close\r\n\r\n");
+
+    //Serial.println("request Sent");
+  }
+  while (client.connected()) {
+    String line = client.readStringUntil('\n');
+    if (line == "\r") {
+      // Serial.println("headers received");
+      break;
+    }
+  }
+  String line = client.readStringUntil('\n');
+
+  //Serial.println("reply was:");
+  //Serial.println("==========");
+  //Serial.println(line);
+  //Serial.println("==========");
+  //Serial.println("closing connection");
+  ret = 1;
+  return ret;
+}
+
+/*int getCurrentTime(String input){
+  int retVal = 0;
+    
+    if(input == "year"){
+      retVal = timeinfo.tm_year + 1900;
+      //return year;
+    }else if(input == "month"){
+      retVal = timeinfo.tm_mon + 1;
+      //return month;
+    }else if(input == "day"){
+      retVal = timeinfo.tm_mday;
+      //return day;
+    }else if(input == "hour"){
+      retVal = timeinfo.tm_hour;
+      //return hour;
+    }else if (input == "minute"){
+      retVal = timeinfo.tm_min;
+      //return minute;
+    }
+    return retVal;
+} */
+
+/*bool getNTPtime(int sec) {
+
+  {
+    uint32_t start = millis();
+    do {
+      time(&now);
+      localtime_r(&now, &timeinfo);
+      //Serial.print("*");
+      delay(10);
+    } while (((millis() - start) <= (1000 * sec)) && (timeinfo.tm_year < (2016 - 1900)));
+    if (timeinfo.tm_year <= (2016 - 1900)) return false;  // the NTP call was not successful
+    //Serial.print("now ");
+    //Serial.println(now);
+    char time_output[30];
+    //strftime(time_output, 30, "%a  %d-%m-%y %T", localtime(&now));
+    //Serial.println(time_output);
+    //Serial.println();
+  }
+  return true;
+}
+
+void setTheTime(tm localTime) {
+  if (wifiConnected) {
+    Serial.print("Day is: ");
+    currentDay = localTime.tm_mday;
+    Serial.println(currentDay);
+    Serial.print("Month is: ");
+    currentMonth = localTime.tm_mon + 1;
+    Serial.println(currentMonth);
+    Serial.print("Year is: ");
+    currentYear = localTime.tm_year - 100;
+    Serial.println(currentYear);
+    Serial.print("Hour is: ");
+    currentHour = localTime.tm_hour;
+    Serial.println(currentHour);
+    Serial.print("Minute is: ");
+    currentMinute = localTime.tm_min;
+    Serial.println(currentMinute);
+    Serial.print("Second is: ");
+    currentSecond = localTime.tm_sec;
+    Serial.println(currentSecond);
+    Serial.print(" Day of Week ");
+    if (localTime.tm_wday == 0) Serial.println(7);
+    else Serial.println(localTime.tm_wday);
+  } else {
+    RtcDateTime dt = Rtc.GetDateTime();
+    currentMonth = dt.Month();
+    Serial.print("RTC month is: ");
+    Serial.print(currentMonth);
+    currentDay = dt.Day();
+    Serial.print("RTC day is: ");
+    Serial.print(currentDay);
+    currentYear = dt.Year();
+    Serial.print("RTC year is: ");
+    Serial.print(currentYear);
+    currentHour = dt.Hour();
+    Serial.print("RTC hour is: ");
+    Serial.print(currentHour);
+    currentMinute = dt.Minute();
+    Serial.print("RTC minute is: ");
+    Serial.print(currentMinute);
+    currentSecond = dt.Second();
+    Serial.print("RTC second is: ");
+    Serial.print(currentSecond);
+  }
+}
+
+void setRtcTime() {
+  RtcDateTime currentTime = RtcDateTime(currentYear, currentMonth, currentDay, currentHour, currentMinute, 0);  //define date and time object
+  Rtc.SetDateTime(currentTime);                                                                                 //configure the RTC with object
+} */
+
+void doseBlue(int evt){
+  //Serial.println("In Dose BLUE");
+  if(!greenDosing && !yellowDosing && !purpleDosing && !blueDosed){
+    WebSerial.print("B");
+    blueDosing = doser->dose(1);
+    bluePumpPending = false;
+    if(!blueDosing){         
+      Serial.println("b");
+      WebSerial.print("b");
+      blueDosed = true;
+      if(!bluePumpPending || !greenPumpPending || !yellowPumpPending || !purplePumpPending){
+        mySched->setFlag(evt,0);
+        alreadyReset = true;
+        Serial.print("Resetting evn ");
+        Serial.println(evt);
+      }
+      int err = doser->getErrorCode();
+      if(err == 99){
+        WebSerial.println("D_B_tl");
+      }
+      int amt = addDailyDoseAmt(1,doser->getDoseRun());
+      int rst = sendHttp("Blue_Dosing");
+      //TODO remove
+      
+      //mySched->resetFlag(1);
+      delay(1000); // have to delay here so doesn't reset 15 min timer wait a minute
+    }
+  }else{
+    bluePumpPending = true;
+  }
+            //TODO remove this it is at midnight just testing a every 15min
+  
+}
+
+void doseGreen(int evt){
+           //Serial.println("Thirty Minutes");
+          if(!blueDosing && !yellowDosing && !purpleDosing && !greenDosed){
+              WebSerial.print("G");
+              greenDosing = doser->dose(2);
+              greenPumpPending = false;
+              //Serial.println("Shi9");
+            if(!greenDosing){         
+             // mySched->setFlag(evt,0);
+              Serial.println("g");
+              WebSerial.print("g");
+              greenDosed = true;
+      if(!bluePumpPending || !greenPumpPending || !yellowPumpPending || !purplePumpPending){
+        mySched->setFlag(evt,0);
+      }
+               int err = doser->getErrorCode();
+              if(err == 99){
+                WebSerial.println("D_G_tl");
+              }
+              int amt = addDailyDoseAmt(2,doser->getDoseRun());
+              int rst = sendHttp("Green_Dosing");
+           delay(1000); // have to delay here so doesn't reset 15 min timer wait a minute
+            }
+          }else{
+            greenPumpPending = true;
+          }
+}
+
+void doseYellow(int evt){
+  if(!blueDosing && !greenDosing && !purpleDosing && !yellowDosed){
+    WebSerial.print("Y");
+    yellowDosing = doser->dose(3);
+    yellowPumpPending = false;
+    if(!yellowDosing){         
+      //mySched->setFlag(evt,0);
+      Serial.println("y");
+      WebSerial.print("y"); 
+      yellowDosed = true;
+      if(!bluePumpPending || !greenPumpPending || !yellowPumpPending || !purplePumpPending){
+        mySched->setFlag(evt,0);
+      }
+      int err = doser->getErrorCode();
+      if(err == 99){
+       WebSerial.println("D_Y_tl");
+      }
+    int amt = addDailyDoseAmt(3,doser->getDoseRun());
+
+    }
+  
+  int rst = sendHttp("Yellow_Dosing");
+  delay(1000);
+}else{
+  yellowPumpPending = true;
+}
+}
+
+void dosePurple(int evt){
+           //Serial.println("Two Hour");
+          if(!blueDosing && !yellowDosing && !greenDosing && !purpleDosed){
+              WebSerial.print("P");
+            purpleDosing = doser->dose(4);
+            purplePumpPending = false;
+            if(!purpleDosing){         
+              //mySched->setFlag(evt,0);
+              Serial.println("p");
+              WebSerial.print("p");
+              purpleDosed = true;
+      if(!bluePumpPending || !greenPumpPending || !yellowPumpPending || !purplePumpPending){
+        mySched->setFlag(evt,0);
+      }
+              int err = doser->getErrorCode();
+              if(err == 99){
+                WebSerial.println("D_P_tl");
+              }
+              int amt = addDailyDoseAmt(4,doser->getDoseRun());
+              int rst = sendHttp("Purple_Dosing");
+            delay(1000); // have to delay here so doesn't reset 15 min timer wait a minute
+            }
+          }else{
+            purplePumpPending = true;
+          }
+}
+
+bool notDosing(){
+  bool retVal = true;
+  if(!blueDosing && !greenDosing && !yellowDosing && ! purpleDosing){
+    retVal = true;
+  }else{
+    retVal = false;
+  }
+  return retVal;
+}
+
