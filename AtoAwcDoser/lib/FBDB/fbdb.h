@@ -6,8 +6,10 @@
 #include <WiFi.h>
 #include "FirebaseESP32.h"
 #include <Firebase.h>
+
 #elif defined(ESP8266)
 #endif
+
 
 //Provide the token generation process info.
 //#include <addons/TokenHelper.h>
@@ -30,6 +32,8 @@
 #define USER_PASSWORD "Skippy"
 
 
+
+
 class Database
 {
   
@@ -50,10 +54,60 @@ class Database
     int getInt(String nam);
     bool getBool(String nam);
     FirebaseJson* getJson(String path);
+    void callBack();
+
+    static bool dataChanged;
+
     
     bool putDailyDoseData(String parent, String child, int amt);
     bool putDailyAfillData(String parent, String child, int amt);
     bool putColorMlSec(String parent, String child, int amt);
+
+    void setEvents();
+    bool isThisEventPumpSet();
+
+    bool isThisEventPumpSet(int evt, int pump);
+
+    int evtPumpArr[31][4] {{0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, 
+                          {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, 
+                          {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, 
+                          {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0},
+                          {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, 
+                          {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0}};
+    //int** getEvtPump();
+/*    int one_hourArr[4];
+    int fifteenArr[4];
+    int thirtyArr[4];
+    int two_hourArr[4];
+    int three_hourArr[4];
+    int four_hourArr[4];
+    int eight_hourArr[4];
+    int twelve_hourArr[4];
+    int midnightArr[4];
+    int one_amArr[4];
+    int two_amArr[4];
+    int three_amArr[4];
+    int four_amArr[4];
+    int five_amArr[4];
+    int six_amArr[4];
+    int seven_amArr[4];
+    int eight_amArr[4];
+    int nine_amArr[4];
+    int ten_amArr[4];
+    int eleven_amArr[4];
+    int noonArr[4];
+     int one_pmArr[4];
+    int two_pmArr[4];
+    int three_pmArr[4];
+    int four_pmArr[4];
+    int five_pmArr[4];
+    int six_pmArr[4];
+    int seven_pmArr[4];
+    int eight_pmArr[4];
+    int nine_pmArr[4];
+    int ten_pmArr[4];
+    int eleven_pmArr[4];
+   */
     
   private:
     //Define Firebase Data object
@@ -62,7 +116,9 @@ class Database
     
     FirebaseAuth auth;
     FirebaseConfig config;
+    bool needToUpdate = false;
     //static FirebaseData stream;
+    
 
 };
 

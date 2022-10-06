@@ -2,8 +2,11 @@
 
   FirebaseData stream;
   FirebaseData fbdo;
+
+  bool Database::dataChanged = false;
   
 Database::Database(){
+
   
 }
 
@@ -46,10 +49,15 @@ void  Database::streamCallback(StreamData data)
   {
       FirebaseJsonArray *arr = data.to<FirebaseJsonArray *>();
       Serial.println(arr->raw());
+      
   }
 
 
   Serial.println();
+  dataChanged = true;
+  //Database db;
+  //db.setEvents();
+  //setEvents();
 
   //This is the size of stream payload received (current and max value)
   //Max payload size is the payload size under the stream path since the stream connected
@@ -100,7 +108,7 @@ void Database::initDb(){
   stream.setBSSLBufferSize(2048 /* Rx in bytes, 512 - 16384 */, 512 /* Tx in bytes, 512 - 16384 */);
 #endif
 
-  if (!Firebase.beginStream(stream, "/test/stream/data"))
+  if (!Firebase.beginStream(stream, "/Doser/event"))
     Serial.printf("sream begin error, %s\n\n", stream.errorReason().c_str());
 
   Firebase.setStreamCallback(stream, this->streamCallback, this->streamTimeoutCallback);
@@ -130,6 +138,8 @@ void Database::initDb(){
   config.timeout.rtdbStreamError = 3 * 1000;
 
   */
+    Serial.println("Just calling setEvent because detected db change");
+   
 }
   bool Database::databaseReady(){
     if (Firebase.ready()){
@@ -284,3 +294,780 @@ bool Database::putData(String path, FirebaseJson json){
       return retVal;
 
     }
+
+    void Database::setEvents(){
+       Serial.println("just ran an update");
+      QueryFilter query;
+      String evt = "";
+      //evtPumpArr = new int* [40];
+      int* arr;
+      for(int i=0;i<32;i++){
+        if(i == 0){
+          evt = "one_hour";
+          //arr = one_hourArr;
+        }else if (i == 1){
+          evt = "fifteen";
+          //arr = fifteenArr;
+        }else if (i == 2){
+          evt = "thirty";
+          //arr = thirtyArr;
+        }else if (i == 3){
+          evt = "two_hour";
+         // arr = two_hourArr;
+        }else if (i == 4){
+          evt = "three_hour";
+         // arr = three_hourArr;
+        }else if (i == 5){
+          evt = "four_hour";
+          //arr = four_hourArr;
+        }else if (i == 6){
+          evt = "eight_hour";
+          //arr = eight_hourArr;
+        }else if (i == 7){
+          evt = "twelve_hour";
+          //arr = twelve_hourArr;
+        }else if (i == 8){
+          evt = "midnight";
+          //arr = one_amArr;
+        }else if (i == 9){
+          evt = "one_am";
+          //arr = one_amArr;
+        }else if (i == 10){
+          evt = "two_am";
+          //arr = two_amArr;
+        }else if (i == 11){
+          evt = "three_am";
+         // arr = three_amArr;
+        }else if (i == 12){
+          evt = "four_am";
+         // arr = four_amArr;
+        }else if (i == 13){
+          evt = "five_am";
+          //arr = five_amArr;
+        }else if (i == 14){
+          evt = "six_am";
+          //arr = six_amArr;
+        }else if (i == 15){
+          evt = "seven_am";
+          //arr = seven_amArr;
+        }else if (i == 16){
+          evt = "eight_am";
+          //arr = eight_amArr;
+        }else if (i == 17){
+          evt = "nine_am";
+          //arr = nine_amArr;
+        }else if (i == 18){
+          evt = "ten_am";
+          //arr = ten_amArr;
+        }else if (i == 19){
+          evt = "eleven_am";
+          //arr = eleven_amArr;
+        }else if (i == 20){
+          evt = "noon";
+        }else if (i == 21){
+          evt = "one_pm";
+          //arr = one_pmArr;
+        }else if (i == 22){
+          evt = "two_pm";
+          //arr = two_pmArr;
+        }else if (i == 23){
+          evt = "three_pm";
+          //arr = three_pmArr;
+        }else if (i == 24){
+          evt = "four_pm";
+          //arr = four_pmArr;
+        }else if (i == 25){
+          evt = "five_pm";
+          //arr = five_pmArr;
+        }else if (i == 26){
+          evt = "six_pm";
+          //arr = six_pmArr;
+        }else if (i == 27){
+          evt = "seven_pm";
+          //arr = seven_pmArr;
+        }else if (i == 28){
+          evt = "eight_pm";
+          //arr = eight_pmArr;
+        }else if (i == 29){
+          evt = "nine_pm";
+          //arr = nine_pmArr;
+        }else if (i == 30){
+          evt = "ten_pm";
+          //arr = ten_pmArr;
+        }else if (i == 31){
+          evt = "eleven_pm";
+          //arr = eleven_pmArr;
+        }
+        //Serial.print("evt in db query is: ");
+        //Serial.println(evt);
+        query.limitToLast(50);
+        if (Firebase.getJSON(fbdo, "/Doser/event/"+evt, query))
+        {
+          // Success, then try to read the JSON payload value
+          /////////////////////////////////////////////////////////
+                  //FirebaseJson *json = data.to<FirebaseJson *>();
+          //Print all object data
+          //Serial.println((const char *)FPSTR("Pretty printed JSON data:"));
+          FirebaseJson &json = fbdo.jsonObject();
+          json.toString(Serial, true);
+          //Serial.println();
+          //Serial.println((const char *)FPSTR("Iterate JSON data:"));
+          //Serial.println();
+          size_t len = json.iteratorBegin();
+          //Serial.print("!!!!!!!!!!!!! interator length iss: ");
+          //Serial.println(len);
+          FirebaseJson::IteratorValue value;
+          for (size_t j = 0; j < len; j++)
+          {
+              value = json.valueAt(j);
+            // Serial.printf((const char *)FPSTR("%d, Type: %s, Name: %s, Value: %s\n"), i, value.type == FirebaseJson::JSON_OBJECT ? (const char *)FPSTR("object") : (const char *)FPSTR("array"), value.key.c_str(), value.value.c_str());
+            int val = value.value.toInt();
+            int k = 0;
+            k = j;
+            if(k ==2){
+              k = 3;   //these come back in alphabetical order blue, green purple, yellow
+            }
+            if(k == 3){
+              k = 2;
+            }
+            //Serial.println("^^^^^^^^^^^^^ made it here");
+            evtPumpArr[i][k] = val;
+            //Serial.print("value is: ");
+            //Serial.println(val);
+           // Serial.print("i is: ");
+            //Serial.println(i);
+            //Serial.print("j is: ");
+            //Serial.println(j);
+            delay(100);
+          }
+          json.iteratorEnd();
+          json.clear();
+      
+  ////////////////////////////////////////////////////////////////////////////////
+          
+          //Serial.println(fbdo.jsonString());
+        }
+        else
+        {
+          // Failed to get JSON data at defined database path, print out the error reason
+          Serial.println(fbdo.errorReason());
+        }
+
+      /* FirebaseJsonData result;
+        FirebaseJsonArray arr;
+        arr.add("Doser/events", "midnight");
+        arr.set("[1]/blue" , "0");
+        arr.set("[1]/green" , "0");
+        arr.set("[1]/yellow" , "0");
+        arr.set("[1]/purple" , "0");
+
+        ar.get(result, "[1]");
+        FirebaseJson json;
+        result.get<FirebaseJson>(json);
+        size_t len = json.iteratorBegin();
+        FirebaseJson::IteratorValue value;
+        for(size_t i = 0;i<len;i++){
+          value = json.valueAt(i);
+          int va = value.value.toInt();
+          
+          Serial.print(va);
+          Serial.println(",");
+        } */
+      }
+    }
+
+    //int** Database::getEvtPump(){
+    //  return evtPumpArr;
+   // }
+
+
+
+
+bool Database::isThisEventPumpSet(int evt, int pump){
+
+  ////////////////////////////////////////////////////////////////////////////////////////////////////////
+  //one_hour=0, fifteen=1, thirty=2, two_hour=3, three_hour=4, 
+  //four_hour=5,eight_hour=6, twelve_hour=7,
+  //midnight=8, one_am=9, two_am=10, three_am=11, four_am=12, 
+  //five_am=13, six_am=14, severn_am=15,
+  //eight_amm=16, nine_am=17 ten_am=18, eleven_am=19,
+  // noon=20, one_pm=21, two_pm=22, three_pm=23, 
+  //four_pm=24, five_pm=25, six_pm=26, severn_pm=27,
+  //eight_pmm=28, nine_pm=29 ten_pm=30, eleven_pm=31,
+  //////////////////////////////////////////////////////////////////////////////////////////////////////
+  bool retVal = false;
+ 
+  retVal = evtPumpArr[evt][pump];
+  if(retVal == 1){
+    retVal = true;
+  }else{
+    retVal = false;
+  }
+  /*if(evt == 0){
+    if(pump == 0){
+      if(one_hourArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(one_hourArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(one_hourArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(one_hourArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 1){
+    if(pump == 0){
+      if(fifteenArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(fifteenArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(fifteenArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(fifteenArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 2){
+    if(pump == 0){
+      if(thirtyArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(thirtyArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(thirtyArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(thirtyArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 3){
+    if(pump == 0){
+      if(two_hourArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(two_hourArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(two_hourArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(two_hourArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 4){
+    if(pump == 0){
+      if(three_hourArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(three_hourArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(three_hourArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(three_hourArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 5){
+    if(pump == 0){
+      if(four_hourArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(four_hourArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(four_hourArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(four_hourArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 6){
+    if(pump == 0){
+      if(eight_hourArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(eight_hourArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(eight_hourArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(eight_hourArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 7){
+    if(pump == 0){
+      if(twelve_hourArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(twelve_hourArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(twelve_hourArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(twelve_hourArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 8){
+    if(pump == 0){
+      if(midnightArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(midnightArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(midnightArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(midnightArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 9){
+    if(pump == 0){
+      if(one_amArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(one_amArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(one_amArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(one_amArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 10){
+    if(pump == 0){
+      if(two_amArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(two_amArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(two_amArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(two_amArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 11){
+    if(pump == 0){
+      if(three_amArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(three_amArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(three_amArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(three_amArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 12){
+    if(pump == 0){
+      if(four_amArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(four_amArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(four_amArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(four_amArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 13){
+    if(pump == 0){
+      if(five_amArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(five_amArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(five_amArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(five_amArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 14){
+    if(pump == 0){
+      if(six_amArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(six_amArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(six_amArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(six_amArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 15){
+    if(pump == 0){
+      if(seven_amArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(seven_amArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(seven_amArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(seven_amArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 16){
+    if(pump == 0){
+      if(eight_amArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(eight_amArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(eight_amArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(eight_amArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 17){
+    if(pump == 0){
+      if(ten_amArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(ten_amArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(ten_amArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(ten_amArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 18){
+    if(pump == 0){
+      if(eleven_amArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(eleven_amArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(eleven_amArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(eleven_amArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 19){
+    if(pump == 0){
+      if(noonArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(noonArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(noonArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(noonArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 20){
+    if(pump == 0){
+      if(one_pmArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(one_pmArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(one_pmArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(one_pmArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 21){
+    if(pump == 0){
+      if(two_pmArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(two_pmArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(two_pmArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 22){
+      if(two_pmArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 22){
+    if(pump == 0){
+      if(three_pmArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(three_pmArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(three_pmArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(three_pmArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 23){
+    if(pump == 0){
+      if(four_pmArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(four_pmArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(four_pmArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(four_pmArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 24){
+    if(pump == 0){
+      if(five_pmArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(five_pmArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(five_pmArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(five_pmArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 25){
+    if(pump == 0){
+      if(six_pmArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(six_pmArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(six_pmArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(six_pmArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 26){
+    if(pump == 0){
+      if(seven_pmArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(seven_pmArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(seven_pmArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(seven_pmArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 27){
+    if(pump == 0){
+      if(eight_pmArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(eight_pmArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(eight_pmArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(eight_pmArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 28){
+    if(pump == 0){
+      if(nine_pmArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(nine_pmArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(nine_pmArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(nine_pmArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 29){
+    if(pump == 0){
+      if(ten_pmArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(ten_pmArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(ten_pmArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(ten_pmArr[3]){
+        retVal = true;
+      }
+    }
+  }else if(evt == 30){
+    if(pump == 0){
+      if(eleven_pmArr[0]){
+        retVal = true;
+      }
+    }else if(pump == 1){
+      if(eleven_pmArr[1]){
+        retVal = true;
+      }
+    }else if(pump == 2){
+      if(eleven_pmArr[2]){
+        retVal = true;
+      }
+    }else if(pump == 3){
+      if(eleven_pmArr[3]){
+        retVal = true;
+      }
+    }
+  }*/
+
+
+  return retVal;
+}
+
+void Database::callBack(){
+  Firebase.setStreamCallback(stream, streamCallback, streamTimeoutCallback);
+}
+
