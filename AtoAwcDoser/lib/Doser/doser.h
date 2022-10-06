@@ -56,13 +56,16 @@ class Doser{
         int MAX_DOSE_RUN = 80000;
         int startTime = 0;
         int stopTime = 0;
-        int BLUEMOTOR = 5;
-        int GREENMOTOR = 33;
-        int YELLOWMOTOR = 32;
-        int PURPLEMOTOR = 15;
+        int BLUEMOTOR = 33;  
+        int GREENMOTOR = 26;  
+        int YELLOWMOTOR = 12;
+        int PURPLEMOTOR = 13;
         long doseStartTime = 0;
         int errorCode = 0;
         int lastDoseRun = 0;
+
+        tm timeinfo;
+        time_t now;
 };
 
 #endif
